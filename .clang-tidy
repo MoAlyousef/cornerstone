@@ -1,0 +1,8 @@
+---
+Checks: 'clang-diagnostic-*,
+clang-analyzer-*,
+cppcoreguidelines-*,
+modernize-*,
+cert-*,
+bugrpone*,
+-modernize-use-trailing-return-type'
