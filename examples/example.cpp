@@ -50,6 +50,20 @@ int disassemble(Arch arch, Syntax syntax, bool radix16, std::string_view assembl
     return 0;
 }
 
+int disassemble_insns(Arch arch, Syntax syntax, bool radix16, std::string_view assembly) {
+    auto engine =
+        Engine::create(Opts{.arch = arch, .syntax = syntax, .lex_masm = radix16}).unwrap();
+    auto out      = engine.assemble(assembly, 0).unwrap();
+    auto insns = engine.disassemble_insns(out, 0).unwrap();
+    for (auto &i: insns) {
+        (void)printf("%s %s\n", i.mnemonic.c_str(), i.op_str.c_str());
+    }
+    puts("");
+    puts("");
+
+    return 0;
+}
+
 int disassemble_twice(Arch arch, Syntax syntax, bool radix16, std::string_view assembly) {
     auto engine =
         Engine::create(Opts{.arch = arch, .syntax = syntax, .lex_masm = radix16}).unwrap();
@@ -66,6 +80,7 @@ int disassemble_twice(Arch arch, Syntax syntax, bool radix16, std::string_view a
 
 int main() {
     assemble(Arch::x86_64, Syntax::Intel, true, LINUX_X64_SH);
+    disassemble_insns(Arch::x86_64, Syntax::Intel, true, LINUX_X64_SH);
     disassemble(Arch::x86_64, Syntax::Intel, true, LINUX_X64_SH);
     disassemble_twice(Arch::x86_64, Syntax::Intel, true, LINUX_X64_SH);
 }

@@ -141,6 +141,60 @@ struct Engine::Impl {
             return Error(ErrorEnum::InsufficientMemory);
         return true;
     }
+
+    Result<std::tuple<
+        std::string,
+        std::unique_ptr<MCContext>,
+        std::unique_ptr<SourceMgr>,
+        std::unique_ptr<MCDisassembler>,
+        std::unique_ptr<MCInstPrinter>>>
+    disassemble_helper(std::string_view bytes_, uint64_t address, bool from_obj) {
+        std::string bytes;
+        if (from_obj) {
+            auto temp = extract_text(bytes_);
+            if (temp.is_err())
+                return temp.unwrap_err();
+            bytes = temp.unwrap();
+        } else {
+            bytes = bytes_;
+        }
+        auto src_mgr = std::make_unique<SourceMgr>();
+        src_mgr->setDiagHandler(
+            +[](const SMDiagnostic &Diag, void *ctx) {
+                auto *err = static_cast<Error *>(ctx);
+                if (err->value == ErrorEnum::None) {
+                    err->value     = ErrorEnum::DisasmError;
+                    err->message   = Diag.getMessage();
+                    err->line_no   = Diag.getLineNo();
+                    err->column_no = Diag.getColumnNo();
+                }
+            },
+            err.get()
+        );
+        auto ctx = std::make_unique<MCContext>(
+            triple, mai.get(), mri.get(), sti.get(), src_mgr.get(), &mc_opts, false
+        );
+        mofi.initMCObjectFileInfo(*ctx, false, false);
+        ctx->setObjectFileInfo(&mofi);
+
+        auto disasm = std::unique_ptr<MCDisassembler>(target->createMCDisassembler(*sti, *ctx));
+        if (!disasm)
+            return Error(ErrorEnum::InsufficientMemory);
+
+        unsigned dialect = !static_cast<unsigned>(syntax);
+        auto printer     = std::unique_ptr<MCInstPrinter>(
+            target->createMCInstPrinter(triple, dialect, *mai, *mii, *mri)
+        );
+        if (!printer)
+            return Error(ErrorEnum::InsufficientMemory);
+        return std::make_tuple(
+            std::move(bytes),
+            std::move(ctx),
+            std::move(src_mgr),
+            std::move(disasm),
+            std::move(printer)
+        );
+    }
 };
 Engine::Engine(Opts opts)
     : impl(std::make_shared<Impl>(opts.arch, opts.syntax, opts.lex_masm, opts.symbol_resolver)) {}
@@ -160,52 +214,8 @@ Result<Engine> Engine::create(Opts opts) {
 }
 
 Result<std::string> Engine::disassemble(std::string_view bytes_, uint64_t address, bool from_obj) {
-    std::string bytes;
-    if (from_obj) {
-        auto temp = extract_text(bytes_);
-        if (temp.is_err())
-            return temp.unwrap_err();
-        bytes = temp.unwrap();
-    } else {
-        bytes = bytes_;
-    }
-    SourceMgr src_mgr;
-    src_mgr.setDiagHandler(
-        +[](const SMDiagnostic &Diag, void *ctx) {
-            auto *err = static_cast<Error *>(ctx);
-            if (err->value == ErrorEnum::None) {
-                err->value     = ErrorEnum::DisasmError;
-                err->message   = Diag.getMessage();
-                err->line_no   = Diag.getLineNo();
-                err->column_no = Diag.getColumnNo();
-            }
-        },
-        impl->err.get()
-    );
-    MCContext ctx(
-        impl->triple,
-        impl->mai.get(),
-        impl->mri.get(),
-        impl->sti.get(),
-        &src_mgr,
-        &impl->mc_opts,
-        false
-    );
-    impl->mofi.initMCObjectFileInfo(ctx, false, false);
-    ctx.setObjectFileInfo(&impl->mofi);
-
-    auto disasm =
-        std::unique_ptr<MCDisassembler>(impl->target->createMCDisassembler(*impl->sti, ctx));
-    if (!disasm)
-        return Error(ErrorEnum::InsufficientMemory);
-
-    unsigned dialect = !static_cast<unsigned>(impl->syntax);
-    auto printer     = std::unique_ptr<MCInstPrinter>(
-        impl->target->createMCInstPrinter(impl->triple, dialect, *impl->mai, *impl->mii, *impl->mri)
-    );
-    if (!printer)
-        return Error(ErrorEnum::InsufficientMemory);
-
+    auto [bytes, ctx, src_mgr, disasm, printer] =
+    impl->disassemble_helper(bytes_, address, from_obj).unwrap();
     uint64_t offset = 0;
     std::string out;
 
@@ -260,52 +270,8 @@ Result<std::string> Engine::disassemble(std::string_view bytes_, uint64_t addres
 Result<InstructionList> Engine::disassemble_insns(
     std::string_view bytes_, uint64_t address, bool from_obj
 ) {
-    std::string bytes;
-    if (from_obj) {
-        auto temp = extract_text(bytes_);
-        if (temp.is_err())
-            return temp.unwrap_err();
-        bytes = temp.unwrap();
-    } else {
-        bytes = bytes_;
-    }
-    SourceMgr src_mgr;
-    src_mgr.setDiagHandler(
-        +[](const SMDiagnostic &Diag, void *ctx) {
-            auto *err = static_cast<Error *>(ctx);
-            if (err->value == ErrorEnum::None) {
-                err->value     = ErrorEnum::DisasmError;
-                err->message   = Diag.getMessage();
-                err->line_no   = Diag.getLineNo();
-                err->column_no = Diag.getColumnNo();
-            }
-        },
-        impl->err.get()
-    );
-    MCContext ctx(
-        impl->triple,
-        impl->mai.get(),
-        impl->mri.get(),
-        impl->sti.get(),
-        &src_mgr,
-        &impl->mc_opts,
-        false
-    );
-    impl->mofi.initMCObjectFileInfo(ctx, false, false);
-    ctx.setObjectFileInfo(&impl->mofi);
-
-    auto disasm =
-        std::unique_ptr<MCDisassembler>(impl->target->createMCDisassembler(*impl->sti, ctx));
-    if (!disasm)
-        return Error(ErrorEnum::InsufficientMemory);
-
-    unsigned dialect = !static_cast<unsigned>(impl->syntax);
-    auto printer     = std::unique_ptr<MCInstPrinter>(
-        impl->target->createMCInstPrinter(impl->triple, dialect, *impl->mai, *impl->mii, *impl->mri)
-    );
-    if (!printer)
-        return Error(ErrorEnum::InsufficientMemory);
-
+    auto [bytes, ctx, src_mgr, disasm, printer] =
+        impl->disassemble_helper(bytes_, address, from_obj).unwrap();
     uint64_t offset = 0;
     InstructionList out;
 
@@ -333,16 +299,16 @@ Result<InstructionList> Engine::disassemble_insns(
         ins.size    = instSize;
         std::memcpy(ins.bytes.data(), bytes.data() + offset, instSize);
 
-        ins.mnemonic = impl->mii->getName(inst.getOpcode());
-
         // operands: reuse the existing printer but split once on the first space
         std::string tmp;
         llvm::raw_string_ostream rs(tmp);
         printer->printInst(&inst, ins.address, "", *impl->sti, rs);
         rs.flush();
-        auto pos   = tmp.find(' ');
-        ins.op_str = (pos == std::string::npos ? "" : tmp.substr(pos + 1));
-        out.push_back(ins);
+        auto first_space = tmp.find(' ');
+        ins.mnemonic     = (first_space == std::string::npos) ? tmp : tmp.substr(0, first_space);
+        ins.op_str       = (first_space == std::string::npos) ? "" : tmp.substr(first_space + 1);
+        out.push_back(std::move(ins));
+        offset += instSize;
     }
 
     if (impl->err->value != ErrorEnum::None)
