@@ -19,7 +19,7 @@ endif()
 
 option(CORNERSTONE_BUILD_SHARED "Builds shared cornerstone library" ON)
 option(CORNERSTONE_BUILD_EXAMPLES "Builds cornerstone examples" OFF)
-option(CORNERSTONE_BUILD_EXAMPLES "Builds cornerstone tests" OFF)
+option(CORNERSTONE_BUILD_TESTS "Builds cornerstone tests" OFF)
 option(CORNERSTONE_ENABLE_ALL_ARCHS "Enables all supported llvm architectures" ON)
 
 option(CORNERSTONE_ENABLE_ARCH_X86 "Enables x86 support" OFF)
