@@ -215,7 +215,7 @@ Result<Engine> Engine::create(Opts opts) {
 
 Result<std::string> Engine::disassemble(std::string_view bytes_, uint64_t address, bool from_obj) {
     auto [bytes, ctx, src_mgr, disasm, printer] =
-    impl->disassemble_helper(bytes_, address, from_obj).unwrap();
+        impl->disassemble_helper(bytes_, address, from_obj).unwrap();
     uint64_t offset = 0;
     std::string out;
 
@@ -304,9 +304,18 @@ Result<InstructionList> Engine::disassemble_insns(
         llvm::raw_string_ostream rs(tmp);
         printer->printInst(&inst, ins.address, "", *impl->sti, rs);
         rs.flush();
-        auto first_space = tmp.find(' ');
-        ins.mnemonic     = (first_space == std::string::npos) ? tmp : tmp.substr(0, first_space);
-        ins.op_str       = (first_space == std::string::npos) ? "" : tmp.substr(first_space + 1);
+        llvm::SmallVector<char, 48> norm(tmp.begin(), tmp.end());
+        std::replace_if(
+            norm.begin(),
+            norm.end(),
+            [](char c) { return std::isspace(static_cast<unsigned char>(c)); },
+            ' '
+        );
+        std::string clean(norm.begin(), norm.end());
+
+        auto first   = clean.find(' ');
+        ins.mnemonic = (first == std::string::npos) ? clean : clean.substr(0, first);
+        ins.op_str   = (first == std::string::npos) ? "" : clean.substr(first + 1);
         out.push_back(std::move(ins));
         offset += instSize;
     }
