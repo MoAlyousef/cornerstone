@@ -299,23 +299,23 @@ Result<InstructionList> Engine::disassemble_insns(
         ins.size    = instSize;
         std::memcpy(ins.bytes.data(), bytes.data() + offset, instSize);
 
-        // operands: reuse the existing printer but split once on the first space
-        std::string tmp;
-        llvm::raw_string_ostream rs(tmp);
+        std::string line;
+        llvm::raw_string_ostream rs(line);
         printer->printInst(&inst, ins.address, "", *impl->sti, rs);
         rs.flush();
-        llvm::SmallVector<char, 48> norm(tmp.begin(), tmp.end());
-        std::replace_if(
-            norm.begin(),
-            norm.end(),
-            [](char c) { return std::isspace(static_cast<unsigned char>(c)); },
-            ' '
-        );
-        std::string clean(norm.begin(), norm.end());
 
-        auto first   = clean.find(' ');
-        ins.mnemonic = (first == std::string::npos) ? clean : clean.substr(0, first);
-        ins.op_str   = (first == std::string::npos) ? "" : clean.substr(first + 1);
+        std::replace_if(
+            line.begin(), line.end(), [](unsigned char c) { return std::isspace(c); }, ' '
+        );
+
+        auto l = line.find_first_not_of(' ');
+        auto r = line.find_last_not_of(' ');
+        line   = (l == std::string::npos) ? "" : line.substr(l, r - l + 1);
+
+        auto sp      = line.find(' ');
+        ins.mnemonic = (sp == std::string::npos) ? line : line.substr(0, sp);
+        ins.op_str   = (sp == std::string::npos) ? "" : line.substr(sp + 1);
+
         out.push_back(std::move(ins));
         offset += instSize;
     }
