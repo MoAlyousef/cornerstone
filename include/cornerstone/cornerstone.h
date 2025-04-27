@@ -152,7 +152,7 @@ typedef enum {
 typedef struct {
     CstnArch arch;                      /**< Target ISA. */
     CstnSyntax syntax;                  /**< Dialect for both assembler & printer. */
-    bool lex_masm;                 /**< Accept MASM integer literals (only Intel syntax). */
+    bool lex_masm;                      /**< Accept MASM integer literals (only Intel syntax). */
     CstnSymbolResolver symbol_resolver; /**< Optional symbol callback. */
 } CstnOpts;
 
@@ -168,6 +168,16 @@ typedef struct {
     int line_no;         /**< 1‑based line (for assembler). */
     int column_no;       /**< 1‑based column. */
 } CstnError;
+
+/** A wrapper around LLVM's MCInst */
+typedef struct {
+    uint64_t address;
+    uint32_t size;
+    char *mnemonic; /* strdup’ed */
+    char *op_str;   /* strdup’ed */
+    // NOLINTNEXTLINE
+    uint8_t bytes[16];
+} CstnInstr;
 
 /** Convenience initializer – returns a zeroed #CstnError. */
 CstnError CstnError_none(void);
@@ -262,6 +272,30 @@ char *cstn_disassemble(
 char *cstn_disassemble_from_obj(
     CstnEngine *cs, const char *code, size_t code_sz, uint64_t address, CstnError *err
 );
+
+/**
+ * Disassemble raw machine code @p code into a dynamic array of instructions.
+ *
+ * @param cs        Engine handle.
+ * @param code      Pointer to bytes to decode.
+ * @param code_sz   Number of bytes in @p code.
+ * @param address   Base address used for PC‑relative operands.
+ * @param out       Dynamic array of instructions.
+ * @param err       [out] diagnostic info.
+ *
+ * @return The size of the dynamic array of instructions.
+ */
+size_t cstn_disassemble_insns(
+    CstnEngine *cs,
+    const char *code,
+    size_t code_sz,
+    uint64_t address,
+    CstnInstr **out, /* malloc’ed array        */
+    CstnError *err
+);
+
+/** Cleanup the returned dynamic array of instructions */
+void cstn_free_insns(CstnInstr *ins, size_t n);
 
 /** Reset an existing error struct, freeing the message string (if any). */
 void CstnError_reset(CstnError *err);

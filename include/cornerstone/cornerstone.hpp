@@ -18,11 +18,14 @@
  */
 
 #include <memory>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <variant>
+#include <vector>
 
 namespace cstn {
 
@@ -114,8 +117,8 @@ enum class Syntax {
  * Immutable configuration used when constructing a new `Engine` instance.
  */
 struct Opts {
-    Arch arch          = Arch::UnknownArch; ///< Target ISA.
-    Syntax syntax      = Syntax::Intel;     ///< Printer/parser dialect.
+    Arch arch     = Arch::UnknownArch; ///< Target ISA.
+    Syntax syntax = Syntax::Intel;     ///< Printer/parser dialect.
     bool lex_masm = true; ///< Accept MASM‑style integer literals when @c syntax==Intel.
     SymbolResolver symbol_resolver = nullptr; ///< Optional symbol callback.
 };
@@ -143,13 +146,17 @@ enum class ErrorEnum {
  * Rich error object returned through `Result<T>`.
  */
 struct Error {
-    ErrorEnum value = ErrorEnum::None;   ///< Error category.
-    std::string message;                 ///< Human‑readable explanation.
-    int line_no   = 0;                   ///< For assembly errors (1‑based).
-    int column_no = 0;                   ///<                      (1‑based).
-    /* implicit */ Error(ErrorEnum val); ///< Construct from category only.
+    ErrorEnum value = ErrorEnum::None;            ///< Error category.
+    std::string message;                          ///< Human‑readable explanation.
+    int line_no   = 0;                            ///< For assembly errors (1‑based).
+    int column_no = 0;                            ///<                      (1‑based).
+    /* implicit */ Error(ErrorEnum val) noexcept; ///< Construct from category only.
 };
 // NOLINTEND
+
+template<class... Alts>
+constexpr bool variant_never_valueless =
+    (std::is_nothrow_move_constructible_v<Alts> && ...);
 
 /**
  * Minimalistic monadic result type.  Either contains a value of @c T *or* an
@@ -159,11 +166,12 @@ struct Error {
  */
 template <typename T>
 class Result {
+    static_assert(variant_never_valueless<T, Error>);
     std::variant<T, Error> v = ErrorEnum::None; ///< Success or error payload.
 
   public:
-    /* implicit */ Result(T val) : v(val) {}
-    /* implicit */ Result(Error e) : v(e) {}
+    /* implicit */ Result(T val) : v(std::move(val)) {}
+    /* implicit */ Result(Error e) : v(std::move(e)) {}
 
     /// @returns @c true if state == OK.
     bool is_ok() { return std::holds_alternative<T>(v); }
@@ -216,6 +224,17 @@ class Result {
     }
 };
 
+/** A wrapper around LLVM's MCInst */
+struct Instruction {
+    uint64_t address;
+    uint32_t size;
+    std::string mnemonic; // e.g. "ret"
+    std::string op_str;   // e.g. "rax, [rbx]"
+    // NOLINTNEXTLINE
+    std::array<uint8_t, 16> bytes; // fits every ISA that LLVM supports
+};
+using InstructionList = std::vector<Instruction>;
+
 /**
  * @class Engine
  * @brief High‑level façade over LLVM MC that can assemble **or** disassemble
@@ -241,13 +260,18 @@ class Engine {
      * @p address (insertion point for labels like ".").
      */
     Result<std::string> assemble(
-        std::string_view assembly, size_t address, bool create_obj = false
+        std::string_view assembly, size_t address = 0, bool create_obj = false
     );
 
     /** Disassemble @p bytes (machine code) into one‑instruction‑per‑line text.
      */
     Result<std::string> disassemble(
-        std::string_view bytes, uint64_t address, bool from_obj = false
+        std::string_view bytes, uint64_t address = 0, bool from_obj = false
+    );
+
+    /** Disassemble @p bytes (machine code) into an @struct Instruction list */
+    Result<InstructionList> disassemble_insns(
+        std::string_view bytes, uint64_t vaddr = 0, bool from_obj = false
     );
 };
 
