@@ -102,14 +102,24 @@ struct Engine::Impl {
     Triple triple;
     MCObjectFileInfo mofi;
     MCTargetOptions mc_opts;
+    std::string cpu;
+    std::string features;
     // Need initialization in Impl::init
     const Target *target                 = nullptr;
     std::unique_ptr<MCRegisterInfo> mri  = nullptr;
     std::unique_ptr<MCAsmInfo> mai       = nullptr;
     std::unique_ptr<MCInstrInfo> mii     = nullptr;
     std::unique_ptr<MCSubtargetInfo> sti = nullptr;
-    Impl(Arch arch_, Syntax syntax_, bool lex_masm_, SymbolResolver s)
-        : arch(arch_), syntax(syntax_), lex_masm(lex_masm_), sym_resolver(s) {}
+    Impl(
+        Arch arch_,
+        Syntax syntax_,
+        bool lex_masm_,
+        SymbolResolver s,
+        std::string cpu_,
+        std::string features_
+    )
+        : arch(arch_), syntax(syntax_), lex_masm(lex_masm_), sym_resolver(s), cpu(cpu_),
+          features(features_) {}
 
     Result<bool> init() {
         init_llvm();
@@ -135,14 +145,18 @@ struct Engine::Impl {
         if (!mii)
             return Error(ErrorEnum::InsufficientMemory, "Insufficient memory");
 
-        sti = std::unique_ptr<MCSubtargetInfo>(target->createMCSubtargetInfo(triple.str(), "", ""));
+        sti = std::unique_ptr<MCSubtargetInfo>(
+            target->createMCSubtargetInfo(triple.str(), cpu, features)
+        );
         if (!sti)
             return Error(ErrorEnum::InsufficientMemory, "Insufficient memory");
         return true;
     }
 };
 Engine::Engine(Opts opts)
-    : impl(std::make_shared<Impl>(opts.arch, opts.syntax, opts.lex_masm, opts.symbol_resolver)) {}
+    : impl(std::make_shared<Impl>(
+          opts.arch, opts.syntax, opts.lex_masm, opts.symbol_resolver, opts.cpu, opts.features
+      )) {}
 
 Result<Engine> Engine::create(Opts opts) {
     Engine engine(opts);
@@ -370,7 +384,7 @@ Result<std::string> Engine::assemble(std::string_view assembly, size_t address, 
     }
 }
 
-Error::Error(ErrorEnum val) noexcept: value(val) {}
+Error::Error(ErrorEnum val) noexcept : value(val) {}
 
 Error::Error(ErrorEnum val, std::string s) noexcept : value(val), message(std::move(s)) {}
 
@@ -407,6 +421,8 @@ extern "C" CstnEngine *cstn_create(CstnOpts opts, CstnError *err) {
     opts0.syntax          = static_cast<cstn::Syntax>(opts.syntax);
     opts0.lex_masm        = opts.lex_masm;
     opts0.symbol_resolver = opts.symbol_resolver;
+    opts0.cpu             = opts.cpu ? opts.cpu : "";
+    opts0.features        = opts.features ? opts.features : "";
     auto ret              = cstn::Engine::create(opts0);
     if (ret.is_ok()) {
         // NOLINTNEXTLINE
@@ -436,7 +452,12 @@ extern "C" void CstnError_reset(CstnError *err) {
 }
 
 extern "C" char *cstn_assemble(
-    CstnEngine *cs, const char *string, uint64_t address, bool create_obj, size_t *sz, CstnError *err
+    CstnEngine *cs,
+    const char *string,
+    uint64_t address,
+    bool create_obj,
+    size_t *sz,
+    CstnError *err
 ) {
     auto engine = static_cast<cstn::Engine *>(cs);
     auto ret    = engine->assemble(string, address, create_obj);

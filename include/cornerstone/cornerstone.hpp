@@ -122,6 +122,8 @@ struct Opts {
     Syntax syntax = Syntax::Intel;     ///< Printer/parser dialect.
     bool lex_masm = true; ///< Accept MASM‑style integer literals when @c syntax==Intel.
     SymbolResolver symbol_resolver = nullptr; ///< Optional symbol callback.
+    std::string cpu;      // "", "cortex-m3", …
+    std::string features; // "+thumb,+v7,+mclass", …
 };
 
 /**

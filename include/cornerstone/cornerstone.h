@@ -154,6 +154,8 @@ typedef struct {
     CstnSyntax syntax;                  /**< Dialect for both assembler & printer. */
     bool lex_masm;                      /**< Accept MASM integer literals (only Intel syntax). */
     CstnSymbolResolver symbol_resolver; /**< Optional symbol callback. */
+    const char *cpu;
+    const char *features;
 } CstnOpts;
 
 /**
