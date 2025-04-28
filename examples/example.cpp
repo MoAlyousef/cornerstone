@@ -26,9 +26,9 @@ const char * const LINUX_X64_SH = R"lit(push 0x68
 
 using namespace cstn;
 
-int assemble(Arch arch, Syntax syntax, bool radix16, std::string_view assembly) {
+int assemble(Arch arch, Syntax syntax, bool lex_masm, std::string_view assembly) {
     auto engine =
-        Engine::create(arch, Opts{.syntax = syntax, .lex_masm = radix16}).unwrap();
+        Engine::create(arch, Opts{.syntax = syntax, .lex_masm = lex_masm}).unwrap();
     auto out = engine.assemble(assembly, 0).unwrap();
     for (auto i : out) {
         printf("0x%02x ", (unsigned char)i);
@@ -39,9 +39,9 @@ int assemble(Arch arch, Syntax syntax, bool radix16, std::string_view assembly) 
     return 0;
 }
 
-int disassemble(Arch arch, Syntax syntax, bool radix16, std::string_view assembly) {
+int disassemble(Arch arch, Syntax syntax, bool lex_masm, std::string_view assembly) {
     auto engine =
-        Engine::create(arch, Opts{.syntax = syntax, .lex_masm = radix16}).unwrap();
+        Engine::create(arch, Opts{.syntax = syntax, .lex_masm = lex_masm}).unwrap();
     auto out      = engine.assemble(assembly, 0).unwrap();
     auto asm_text = engine.disassemble(out, 0).unwrap().pretty_format();
     puts(asm_text.c_str());
@@ -51,9 +51,9 @@ int disassemble(Arch arch, Syntax syntax, bool radix16, std::string_view assembl
     return 0;
 }
 
-int disassemble_insns(Arch arch, Syntax syntax, bool radix16, std::string_view assembly) {
+int disassemble_insns(Arch arch, Syntax syntax, bool lex_masm, std::string_view assembly) {
     auto engine =
-        Engine::create(arch, Opts{.syntax = syntax, .lex_masm = radix16}).unwrap();
+        Engine::create(arch, Opts{.syntax = syntax, .lex_masm = lex_masm}).unwrap();
     auto out      = engine.assemble(assembly, 0).unwrap();
     auto insns = engine.disassemble(out, 0).unwrap();
     std::cout << insns << std::endl;
@@ -63,9 +63,9 @@ int disassemble_insns(Arch arch, Syntax syntax, bool radix16, std::string_view a
     return 0;
 }
 
-int disassemble_twice(Arch arch, Syntax syntax, bool radix16, std::string_view assembly) {
+int disassemble_twice(Arch arch, Syntax syntax, bool lex_masm, std::string_view assembly) {
     auto engine =
-        Engine::create(arch, Opts{.syntax = syntax, .lex_masm = radix16}).unwrap();
+        Engine::create(arch, Opts{.syntax = syntax, .lex_masm = lex_masm}).unwrap();
     auto out      = engine.assemble(assembly, 0).unwrap();
     auto asm_text = engine.disassemble(out, 0).unwrap().pretty_format();
     out           = engine.assemble(asm_text, 0).unwrap();

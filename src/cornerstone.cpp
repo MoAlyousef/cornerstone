@@ -416,7 +416,7 @@ static void cstn_copy_err(CstnError *err, const cstn::Error &error) {
 }
 
 extern "C" CstnEngine *cstn_create(CstnArch arch, CstnOpts *opts, CstnError *err) {
-    cstn::Opts opts0      = {};
+    cstn::Opts opts0 = {};
     if (opts) {
         opts0.syntax          = static_cast<cstn::Syntax>(opts->syntax);
         opts0.lex_masm        = opts->lex_masm;
@@ -424,7 +424,7 @@ extern "C" CstnEngine *cstn_create(CstnArch arch, CstnOpts *opts, CstnError *err
         opts0.cpu             = opts->cpu ? opts->cpu : "";
         opts0.features        = opts->features ? opts->features : "";
     }
-    auto ret              = cstn::Engine::create(static_cast<cstn::Arch>(arch), opts0);
+    auto ret = cstn::Engine::create(static_cast<cstn::Arch>(arch), opts0);
     if (ret.is_ok()) {
         // NOLINTNEXTLINE
         return new cstn::Engine(ret.unwrap());
@@ -541,4 +541,32 @@ extern "C" void cstn_free_insns(CstnInstr *ins, size_t n) {
     }
     delete[] ins;
     // NOLINTEND
+}
+
+extern "C" CstnOpts CstnOpts_default() {
+    CstnOpts opts = {
+        .syntax          = CstnSyntax_Intel,
+        .lex_masm        = true,
+        .symbol_resolver = nullptr,
+        .cpu             = "",
+        .features        = ""
+    };
+    return opts;
+}
+
+extern "C" CstnOpts CstnOpts_new(
+    CstnSyntax syntax,
+    bool lex_masm,
+    CstnSymbolResolver sym_resolver,
+    const char *cpu,
+    const char *features
+) {
+    CstnOpts opts = {
+        .syntax          = syntax,
+        .lex_masm        = lex_masm,
+        .symbol_resolver = sym_resolver,
+        .cpu             = cpu,
+        .features        = features
+    };
+    return opts;
 }

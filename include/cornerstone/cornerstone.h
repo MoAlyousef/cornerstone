@@ -150,7 +150,6 @@ typedef enum {
  * populate the fields individually.
  */
 typedef struct {
-    CstnArch arch;                      /**< Target ISA. */
     CstnSyntax syntax;                  /**< Dialect for both assembler & printer. */
     bool lex_masm;                      /**< Accept MASM integer literals (only Intel syntax). */
     CstnSymbolResolver symbol_resolver; /**< Optional symbol callback. */
@@ -185,6 +184,18 @@ typedef struct {
 /** Convenience initializer – returns a zeroed #CstnError. */
 CstnError CstnError_none(void);
 
+/** Convenience initializer - returns a defaulted #CstnOpts. */
+CstnOpts CstnOpts_default(void);
+
+/** Convenience initializer - returns a new #CstnOpts.  */
+CstnOpts CstnOpts_new(
+    CstnSyntax syntax,
+    bool lex_masm,
+    CstnSymbolResolver sym_resolver,
+    const char *cpu,
+    const char *features
+);
+
 /**
  * Create a new engine according to @p opts.
  *
@@ -217,7 +228,12 @@ void cstn_destroy(CstnEngine *cs);
  * @return Pointer to heap‑allocated memory (use `free()`).  NULL on error.
  */
 char *cstn_assemble(
-    CstnEngine *cs, const char *string, uint64_t address, bool create_obj, size_t *sz, CstnError *err
+    CstnEngine *cs,
+    const char *string,
+    uint64_t address,
+    bool create_obj,
+    size_t *sz,
+    CstnError *err
 );
 
 /**

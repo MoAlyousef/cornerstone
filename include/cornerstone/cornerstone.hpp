@@ -255,8 +255,8 @@ struct InstructionList {
  * heavy implementation lives in a shared `std::shared_ptr<Impl>`.
  */
 class Engine {
-    struct Impl;                ///< Private, defined in .cpp.
-    std::shared_ptr<Impl> impl; ///< PIMPL to keep header clean.
+    struct Impl;                           ///< Private, defined in .cpp.
+    std::shared_ptr<Impl> impl;            ///< PIMPL to keep header clean.
     explicit Engine(Arch arch, Opts opts); ///< Internal – use `create()` instead.
 
   public:

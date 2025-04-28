@@ -25,10 +25,8 @@ const char * const LINUX_X64_SH =
     "pop rax\n"
     "syscall\n";
 
-int assemble(CstnArch arch, CstnSyntax syntax, bool radix16, const char *assembly) {
-    CstnOpts opts = {
-        .syntax = syntax, .lex_masm = radix16, .symbol_resolver = NULL
-    };
+int assemble(CstnArch arch, CstnSyntax syntax, bool lex_masm, const char *assembly) {
+    CstnOpts opts = CstnOpts_new(syntax, lex_masm, NULL, NULL, NULL);
     CstnError err  = CstnError_none();
     CstnEngine *cs = cstn_create(arch, &opts, &err);
 
@@ -60,10 +58,8 @@ int assemble(CstnArch arch, CstnSyntax syntax, bool radix16, const char *assembl
     return 0;
 }
 
-int disassemble(CstnArch arch, CstnSyntax syntax, bool radix16, const char *assembly) {
-    CstnOpts opts = {
-        .syntax = syntax, .lex_masm = radix16, .symbol_resolver = NULL
-    };
+int disassemble(CstnArch arch, CstnSyntax syntax, bool lex_masm, const char *assembly) {
+    CstnOpts opts = CstnOpts_new(syntax, lex_masm, NULL, NULL, NULL);
     CstnError err  = CstnError_none();
     CstnEngine *cs = cstn_create(arch, &opts, &err);
 
