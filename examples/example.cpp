@@ -28,7 +28,7 @@ using namespace cstn;
 
 int assemble(Arch arch, Syntax syntax, bool radix16, std::string_view assembly) {
     auto engine =
-        Engine::create(Opts{.arch = arch, .syntax = syntax, .lex_masm = radix16}).unwrap();
+        Engine::create(arch, Opts{.syntax = syntax, .lex_masm = radix16}).unwrap();
     auto out = engine.assemble(assembly, 0).unwrap();
     for (auto i : out) {
         printf("0x%02x ", (unsigned char)i);
@@ -41,7 +41,7 @@ int assemble(Arch arch, Syntax syntax, bool radix16, std::string_view assembly) 
 
 int disassemble(Arch arch, Syntax syntax, bool radix16, std::string_view assembly) {
     auto engine =
-        Engine::create(Opts{.arch = arch, .syntax = syntax, .lex_masm = radix16}).unwrap();
+        Engine::create(arch, Opts{.syntax = syntax, .lex_masm = radix16}).unwrap();
     auto out      = engine.assemble(assembly, 0).unwrap();
     auto asm_text = engine.disassemble(out, 0).unwrap().pretty_format();
     puts(asm_text.c_str());
@@ -53,7 +53,7 @@ int disassemble(Arch arch, Syntax syntax, bool radix16, std::string_view assembl
 
 int disassemble_insns(Arch arch, Syntax syntax, bool radix16, std::string_view assembly) {
     auto engine =
-        Engine::create(Opts{.arch = arch, .syntax = syntax, .lex_masm = radix16}).unwrap();
+        Engine::create(arch, Opts{.syntax = syntax, .lex_masm = radix16}).unwrap();
     auto out      = engine.assemble(assembly, 0).unwrap();
     auto insns = engine.disassemble(out, 0).unwrap();
     std::cout << insns << std::endl;
@@ -65,7 +65,7 @@ int disassemble_insns(Arch arch, Syntax syntax, bool radix16, std::string_view a
 
 int disassemble_twice(Arch arch, Syntax syntax, bool radix16, std::string_view assembly) {
     auto engine =
-        Engine::create(Opts{.arch = arch, .syntax = syntax, .lex_masm = radix16}).unwrap();
+        Engine::create(arch, Opts{.syntax = syntax, .lex_masm = radix16}).unwrap();
     auto out      = engine.assemble(assembly, 0).unwrap();
     auto asm_text = engine.disassemble(out, 0).unwrap().pretty_format();
     out           = engine.assemble(asm_text, 0).unwrap();

@@ -118,12 +118,11 @@ enum class Syntax {
  * Immutable configuration used when constructing a new `Engine` instance.
  */
 struct Opts {
-    Arch arch     = Arch::UnknownArch; ///< Target ISA.
-    Syntax syntax = Syntax::Intel;     ///< Printer/parser dialect.
-    bool lex_masm = true; ///< Accept MASM‑style integer literals when @c syntax==Intel.
+    Syntax syntax = Syntax::Intel; ///< Printer/parser dialect.
+    bool lex_masm = true;          ///< Accept MASM‑style integer literals when @c syntax==Intel.
     SymbolResolver symbol_resolver = nullptr; ///< Optional symbol callback.
-    std::string cpu;      // "", "cortex-m3", …
-    std::string features; // "+thumb,+v7,+mclass", …
+    std::string cpu;                          // "", "cortex-m3", …
+    std::string features;                     // "+thumb,+v7,+mclass", …
 };
 
 /**
@@ -258,14 +257,14 @@ struct InstructionList {
 class Engine {
     struct Impl;                ///< Private, defined in .cpp.
     std::shared_ptr<Impl> impl; ///< PIMPL to keep header clean.
-    explicit Engine(Opts opts); ///< Internal – use `create()` instead.
+    explicit Engine(Arch arch, Opts opts); ///< Internal – use `create()` instead.
 
   public:
     /** Factory that performs safe construction.
      *  @returns `Result<Engine>` that contains a fully‑initialised engine or a
      *           diagnostic error.
      */
-    static Result<Engine> create(Opts opts);
+    static Result<Engine> create(Arch arch, Opts opts);
 
     /**
      * Assemble @p assembly into an object‑file byte stream starting at

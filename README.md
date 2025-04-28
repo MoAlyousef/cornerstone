@@ -73,7 +73,7 @@ cmake -DCORNERSTONE_BUILD_SHARED=ON ..  # OFF ⇒ static
 #include <cornerstone/cornerstone.hpp>
 
 int main() {
-    auto eng = cstn::Engine::create({ .arch = cstn::Arch::x86_64 }).unwrap();
+    auto eng = cstn::Engine::create(Arch::x86_64, { .syntax = cstn::Syntax::Intel }).unwrap();
 
     std::string obj = eng.assemble("mov eax, 42\nret", 0x401000).unwrap();
 
@@ -114,8 +114,7 @@ static bool my_resolver(const char *sym, uint64_t *val) {
 
 int main() {
     CstnError err = CstnError_none();
-    CstnEngine *e = cstn_create((CstnOpts){
-        .arch = CstnArch_x86_64,
+    CstnEngine *e = cstn_create(CstnArch_x86_64, (CstnOpts){
         .syntax = CstnSyntax_Intel,
         .symbol_resolver = my_resolver }, &err);
 

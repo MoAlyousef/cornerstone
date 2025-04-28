@@ -153,13 +153,13 @@ struct Engine::Impl {
         return true;
     }
 };
-Engine::Engine(Opts opts)
+Engine::Engine(Arch arch, Opts opts)
     : impl(std::make_shared<Impl>(
-          opts.arch, opts.syntax, opts.lex_masm, opts.symbol_resolver, opts.cpu, opts.features
+          arch, opts.syntax, opts.lex_masm, opts.symbol_resolver, opts.cpu, opts.features
       )) {}
 
-Result<Engine> Engine::create(Opts opts) {
-    Engine engine(opts);
+Result<Engine> Engine::create(Arch arch, Opts opts) {
+    Engine engine(arch, opts);
     auto ret = engine.impl->init();
     if (ret.is_err()) {
         return ret.unwrap_err();
@@ -415,15 +415,14 @@ static void cstn_copy_err(CstnError *err, const cstn::Error &error) {
     err->line_no   = error.line_no;
 }
 
-extern "C" CstnEngine *cstn_create(CstnOpts opts, CstnError *err) {
+extern "C" CstnEngine *cstn_create(CstnArch arch, CstnOpts opts, CstnError *err) {
     cstn::Opts opts0      = {};
-    opts0.arch            = static_cast<cstn::Arch>(opts.arch);
     opts0.syntax          = static_cast<cstn::Syntax>(opts.syntax);
     opts0.lex_masm        = opts.lex_masm;
     opts0.symbol_resolver = opts.symbol_resolver;
     opts0.cpu             = opts.cpu ? opts.cpu : "";
     opts0.features        = opts.features ? opts.features : "";
-    auto ret              = cstn::Engine::create(opts0);
+    auto ret              = cstn::Engine::create(static_cast<cstn::Arch>(arch), opts0);
     if (ret.is_ok()) {
         // NOLINTNEXTLINE
         return new cstn::Engine(ret.unwrap());

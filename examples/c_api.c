@@ -27,10 +27,10 @@ const char * const LINUX_X64_SH =
 
 int assemble(CstnArch arch, CstnSyntax syntax, bool radix16, const char *assembly) {
     CstnOpts opts = {
-        .arch = arch, .syntax = syntax, .lex_masm = radix16, .symbol_resolver = NULL
+        .syntax = syntax, .lex_masm = radix16, .symbol_resolver = NULL
     };
     CstnError err  = CstnError_none();
-    CstnEngine *cs = cstn_create(opts, &err);
+    CstnEngine *cs = cstn_create(arch, opts, &err);
 
     if (err.value != CstnError_None) {
         printf("Error code: %d, Error message: %s\n", (int)err.value, err.message);
@@ -62,10 +62,10 @@ int assemble(CstnArch arch, CstnSyntax syntax, bool radix16, const char *assembl
 
 int disassemble(CstnArch arch, CstnSyntax syntax, bool radix16, const char *assembly) {
     CstnOpts opts = {
-        .arch = arch, .syntax = syntax, .lex_masm = radix16, .symbol_resolver = NULL
+        .syntax = syntax, .lex_masm = radix16, .symbol_resolver = NULL
     };
     CstnError err  = CstnError_none();
-    CstnEngine *cs = cstn_create(opts, &err);
+    CstnEngine *cs = cstn_create(arch, opts, &err);
 
     if (err.value != CstnError_None) {
         printf("Error code: %d, Error message: %s\n", (int)err.value, err.message);
@@ -78,7 +78,7 @@ int disassemble(CstnArch arch, CstnSyntax syntax, bool radix16, const char *asse
 
     size_t size = 0;
     char *ret   = NULL;
-    CstnInstr *insns;
+    CstnInstr *insns = NULL;
     if ((ret = cstn_assemble(cs, assembly, 0, false, &size, &err))) {
         size_t count = cstn_disassemble(cs, ret, size, false, 0, &insns, &err);
         char *asm_text = cstn_format_insns(insns, count);

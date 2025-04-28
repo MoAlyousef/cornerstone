@@ -195,7 +195,7 @@ CstnError CstnError_none(void);
  *
  * @return Non‑NULL on success; NULL on failure (see @p err).
  */
-CstnEngine *cstn_create(CstnOpts opts, CstnError *err);
+CstnEngine *cstn_create(CstnArch arch, CstnOpts opts, CstnError *err);
 
 /** Destroy an engine previously returned from #cstn_create. */
 void cstn_destroy(CstnEngine *cs);

@@ -26,7 +26,7 @@ const char *LINUX_X64_SH = R"lit(push 0x68
 
 TEST(Test1, Output) {
     auto engine =
-        Engine::create(Opts{.arch = Arch::x86_64, .syntax = Syntax::Intel, .lex_masm = true})
+        Engine::create(Arch::x86_64, Opts{.syntax = Syntax::Intel, .lex_masm = true})
             .unwrap();
     auto a = engine.assemble(LINUX_X64_SH, 0).unwrap();
     auto d = engine.disassemble(a, 0).unwrap().pretty_format();

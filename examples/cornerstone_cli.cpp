@@ -95,7 +95,7 @@ int main(int argc, char **argv) try {
     }
     std::string input((std::istreambuf_iterator<char>(*in)), std::istreambuf_iterator<char>());
 
-    auto eng = cstn::Engine::create({arch, syn}).unwrap();
+    auto eng = cstn::Engine::create(arch, {syn}).unwrap();
 
     if (do_asm) {
         auto obj = eng.assemble(input, addr, true).unwrap();
