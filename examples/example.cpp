@@ -1,8 +1,9 @@
 #include <cstdio>
+#include <iostream>
 
 #include <cornerstone/cornerstone.hpp>
 
-const char *LINUX_X64_SH = R"lit(push 0x68
+const char * const LINUX_X64_SH = R"lit(push 0x68
     mov rax, 0x732f2f2f6e69622f
     push rax
     mov rdi, rsp
@@ -42,7 +43,7 @@ int disassemble(Arch arch, Syntax syntax, bool radix16, std::string_view assembl
     auto engine =
         Engine::create(Opts{.arch = arch, .syntax = syntax, .lex_masm = radix16}).unwrap();
     auto out      = engine.assemble(assembly, 0).unwrap();
-    auto asm_text = engine.disassemble(out, 0).unwrap();
+    auto asm_text = engine.disassemble(out, 0).unwrap().pretty_format();
     puts(asm_text.c_str());
     puts("");
     puts("");
@@ -54,10 +55,8 @@ int disassemble_insns(Arch arch, Syntax syntax, bool radix16, std::string_view a
     auto engine =
         Engine::create(Opts{.arch = arch, .syntax = syntax, .lex_masm = radix16}).unwrap();
     auto out      = engine.assemble(assembly, 0).unwrap();
-    auto insns = engine.disassemble_insns(out, 0).unwrap();
-    for (auto &i: insns) {
-        (void)printf("%s %s\n", i.mnemonic.c_str(), i.op_str.c_str());
-    }
+    auto insns = engine.disassemble(out, 0).unwrap();
+    std::cout << insns << std::endl;
     puts("");
     puts("");
 
@@ -68,9 +67,9 @@ int disassemble_twice(Arch arch, Syntax syntax, bool radix16, std::string_view a
     auto engine =
         Engine::create(Opts{.arch = arch, .syntax = syntax, .lex_masm = radix16}).unwrap();
     auto out      = engine.assemble(assembly, 0).unwrap();
-    auto asm_text = engine.disassemble(out, 0).unwrap();
+    auto asm_text = engine.disassemble(out, 0).unwrap().pretty_format();
     out           = engine.assemble(asm_text, 0).unwrap();
-    asm_text      = engine.disassemble(out, 0).unwrap();
+    asm_text      = engine.disassemble(out, 0).unwrap().pretty_format();
     puts(asm_text.c_str());
     puts("");
     puts("");

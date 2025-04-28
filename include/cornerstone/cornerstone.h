@@ -32,9 +32,9 @@ extern "C" {
 #include <stdint.h>
 #include <stdlib.h>
 
-/* -------------------------------------------------------------------------- */
-/*                                Callbacks                                   */
-/* -------------------------------------------------------------------------- */
+// NOLINTBEGIN
+/** Opaque handle to an engine instance (see `cstn_create()`). */
+typedef void CstnEngine;
 
 /**
  * @typedef CstnSymbolResolver
@@ -176,22 +176,12 @@ typedef struct {
     char *mnemonic; /* strdup’ed */
     char *op_str;   /* strdup’ed */
     // NOLINTNEXTLINE
-    uint8_t bytes[16];
+    uint8_t bytes[24];
 } CstnInstr;
+// NOLINTEND
 
 /** Convenience initializer – returns a zeroed #CstnError. */
 CstnError CstnError_none(void);
-
-/* -------------------------------------------------------------------------- */
-/*                                 Opaque                                     */
-/* -------------------------------------------------------------------------- */
-
-/** Opaque handle to an engine instance (see `cstn_create()`). */
-typedef void CstnEngine;
-
-/* -------------------------------------------------------------------------- */
-/*                               Constructors                                 */
-/* -------------------------------------------------------------------------- */
 
 /**
  * Create a new engine according to @p opts.
@@ -215,16 +205,17 @@ void cstn_destroy(CstnEngine *cs);
 /**
  * Assemble textual @p string into raw machine code.
  *
- * @param cs      Engine handle.
- * @param string  UTF‑8 assembly source (null‑terminated).
- * @param address Origin address that “.” and label references start from.
- * @param sz      [out] size in bytes of the returned buffer.
- * @param err     [out] diagnostic info (see #CstnError).  Must not be NULL.
+ * @param cs            Engine handle.
+ * @param string        UTF‑8 assembly source (null‑terminated).
+ * @param address       Origin address that “.” and label references start from.
+ * @param create_obj    Whether cornerstone should create an object-file format output.
+ * @param sz            [out] size in bytes of the returned buffer.
+ * @param err           [out] diagnostic info (see #CstnError).  Must not be NULL.
  *
  * @return Pointer to heap‑allocated memory (use `free()`).  NULL on error.
  */
 char *cstn_assemble(
-    CstnEngine *cs, const char *string, uint64_t address, size_t *sz, CstnError *err
+    CstnEngine *cs, const char *string, uint64_t address, bool create_obj, size_t *sz, CstnError *err
 );
 
 /**
@@ -243,56 +234,30 @@ char *cstn_assemble_to_obj(
 );
 
 /**
- * Disassemble raw machine code @p code into one‑instruction‑per‑line text.
- *
- * @param cs        Engine handle.
- * @param code      Pointer to bytes to decode.
- * @param code_sz   Number of bytes in @p code.
- * @param address   Base address used for PC‑relative operands.
- * @param err       [out] diagnostic info.
- *
- * @return Heap‑allocated UTF‑8 string; NULL on error.
- */
-char *cstn_disassemble(
-    CstnEngine *cs, const char *code, size_t code_sz, uint64_t address, CstnError *err
-);
-
-/**
- * Disassemble raw object-file byte buffer @p code into one‑instruction‑per‑line
- * text.
- *
- * @param cs        Engine handle.
- * @param code      Pointer to bytes to decode.
- * @param code_sz   Number of bytes in @p code.
- * @param address   Base address used for PC‑relative operands.
- * @param err       [out] diagnostic info.
- *
- * @return Heap‑allocated UTF‑8 string; NULL on error.
- */
-char *cstn_disassemble_from_obj(
-    CstnEngine *cs, const char *code, size_t code_sz, uint64_t address, CstnError *err
-);
-
-/**
  * Disassemble raw machine code @p code into a dynamic array of instructions.
  *
  * @param cs        Engine handle.
  * @param code      Pointer to bytes to decode.
  * @param code_sz   Number of bytes in @p code.
  * @param address   Base address used for PC‑relative operands.
+ * @param from_obj  Whether the cornerstone-engine should extract the text section.
  * @param out       Dynamic array of instructions.
  * @param err       [out] diagnostic info.
  *
  * @return The size of the dynamic array of instructions.
  */
-size_t cstn_disassemble_insns(
+size_t cstn_disassemble(
     CstnEngine *cs,
     const char *code,
     size_t code_sz,
     uint64_t address,
-    CstnInstr **out, /* malloc’ed array        */
+    bool from_obj,
+    CstnInstr **out,
     CstnError *err
 );
+
+/** Formats the instructions in a one line per instruction format */
+char *cstn_format_insns(CstnInstr *ins, size_t n);
 
 /** Cleanup the returned dynamic array of instructions */
 void cstn_free_insns(CstnInstr *ins, size_t n);

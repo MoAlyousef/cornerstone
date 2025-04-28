@@ -3,26 +3,27 @@
 
 #include <cornerstone/cornerstone.h>
 
-const char *LINUX_X64_SH = R"lit(push 0x68
-    mov rax, 0x732f2f2f6e69622f
-    push rax
-    mov rdi, rsp
-    /* push argument array ['sh\x00'] */
-    /* push b'sh\x00' */
-    push 0x1010101 ^ 0x6873
-    xor dword ptr [rsp], 0x1010101
-    xor esi, esi /* 0 */
-    push rsi /* null terminate */
-    push 8
-    pop rsi
-    add rsi, rsp
-    push rsi /* 'sh\x00' */
-    mov rsi, rsp
-    xor edx, edx /* 0 */
-    /* call execve() */
-    push 0x3b /* SYS_execve */
-    pop rax
-    syscall)lit";
+const char * const LINUX_X64_SH =
+    "push 0x68\n"
+    "mov rax, 0x732f2f2f6e69622f\n"
+    "push rax\n"
+    "mov rdi, rsp\n"
+    "/* push argument array ['sh\\x00'] */\n"
+    "/* push b'sh\\x00' */\n"
+    "push 0x1010101 ^ 0x6873\n"
+    "xor dword ptr [rsp], 0x1010101\n"
+    "xor esi, esi /* 0 */\n"
+    "push rsi /* null terminate */\n"
+    "push 8\n"
+    "pop rsi\n"
+    "add rsi, rsp\n"
+    "push rsi /* 'sh\\x00' */\n"
+    "mov rsi, rsp\n"
+    "xor edx, edx /* 0 */\n"
+    "/* call execve() */\n"
+    "push 0x3b /* SYS_execve */\n"
+    "pop rax\n"
+    "syscall\n";
 
 int assemble(CstnArch arch, CstnSyntax syntax, bool radix16, const char *assembly) {
     CstnOpts opts = {
@@ -42,7 +43,7 @@ int assemble(CstnArch arch, CstnSyntax syntax, bool radix16, const char *assembl
 
     size_t size        = 0;
     unsigned char *ret = NULL;
-    if ((ret = (unsigned char *)cstn_assemble(cs, assembly, 0, &size, &err))) {
+    if ((ret = (unsigned char *)cstn_assemble(cs, assembly, 0, false, &size, &err))) {
         for (size_t i = 0; i < size; i++) {
             printf("0x%02x ", ret[i]);
         }
@@ -77,8 +78,10 @@ int disassemble(CstnArch arch, CstnSyntax syntax, bool radix16, const char *asse
 
     size_t size = 0;
     char *ret   = NULL;
-    if ((ret = cstn_assemble(cs, assembly, 0, &size, &err))) {
-        char *asm_text = cstn_disassemble(cs, ret, size, 0, &err);
+    CstnInstr *insns;
+    if ((ret = cstn_assemble(cs, assembly, 0, false, &size, &err))) {
+        size_t count = cstn_disassemble(cs, ret, size, false, 0, &insns, &err);
+        char *asm_text = cstn_format_insns(insns, count);
         puts(asm_text);
         free(asm_text);
         free(ret);

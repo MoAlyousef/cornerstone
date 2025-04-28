@@ -18,6 +18,7 @@
  */
 
 #include <memory>
+#include <ostream>
 #include <span>
 #include <sstream>
 #include <stdexcept>
@@ -150,13 +151,13 @@ struct Error {
     std::string message;                          ///< Human‑readable explanation.
     int line_no   = 0;                            ///< For assembly errors (1‑based).
     int column_no = 0;                            ///<                      (1‑based).
-    /* implicit */ Error(ErrorEnum val) noexcept; ///< Construct from category only.
+    explicit Error(ErrorEnum val) noexcept;       ///< Construct from category only.
+    Error(ErrorEnum val, std::string s) noexcept; ///< Construct an error with a message
 };
 // NOLINTEND
 
-template<class... Alts>
-constexpr bool variant_never_valueless =
-    (std::is_nothrow_move_constructible_v<Alts> && ...);
+template <class... Alts>
+constexpr bool variant_never_valueless = (std::is_nothrow_move_constructible_v<Alts> && ...);
 
 /**
  * Minimalistic monadic result type.  Either contains a value of @c T *or* an
@@ -167,7 +168,7 @@ constexpr bool variant_never_valueless =
 template <typename T>
 class Result {
     static_assert(variant_never_valueless<T, Error>);
-    std::variant<T, Error> v = ErrorEnum::None; ///< Success or error payload.
+    std::variant<T, Error> v = Error(ErrorEnum::None); ///< Success or error payload.
 
   public:
     /* implicit */ Result(T val) : v(std::move(val)) {}
@@ -231,9 +232,18 @@ struct Instruction {
     std::string mnemonic; // e.g. "ret"
     std::string op_str;   // e.g. "rax, [rbx]"
     // NOLINTNEXTLINE
-    std::array<uint8_t, 16> bytes; // fits every ISA that LLVM supports
+    std::array<uint8_t, 24> bytes; // fits every ISA that LLVM supports
 };
-using InstructionList = std::vector<Instruction>;
+
+/// A vector of @class Instruction.
+/// Allows pretty printing.
+struct InstructionList {
+    std::vector<Instruction> insns;
+    /** Format instructions into one‑instruction‑per‑line text.
+     */
+    std::string pretty_format();
+    friend std::ostream &operator<<(std::ostream &os, InstructionList &i);
+};
 
 /**
  * @class Engine
@@ -258,20 +268,16 @@ class Engine {
     /**
      * Assemble @p assembly into an object‑file byte stream starting at
      * @p address (insertion point for labels like ".").
+     * @p create_obj Creates an object-file format which includes an explict text section
      */
     Result<std::string> assemble(
         std::string_view assembly, size_t address = 0, bool create_obj = false
     );
 
-    /** Disassemble @p bytes (machine code) into one‑instruction‑per‑line text.
-     */
-    Result<std::string> disassemble(
+    /** Disassemble @p bytes (machine code) into an @struct Instruction list, @p from_obj determines
+     * whether the bytes contain a text section that requires extraction */
+    Result<InstructionList> disassemble(
         std::string_view bytes, uint64_t address = 0, bool from_obj = false
-    );
-
-    /** Disassemble @p bytes (machine code) into an @struct Instruction list */
-    Result<InstructionList> disassemble_insns(
-        std::string_view bytes, uint64_t vaddr = 0, bool from_obj = false
     );
 };
 

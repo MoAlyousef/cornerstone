@@ -29,7 +29,7 @@ TEST(Test1, Output) {
         Engine::create(Opts{.arch = Arch::x86_64, .syntax = Syntax::Intel, .lex_masm = true})
             .unwrap();
     auto a = engine.assemble(LINUX_X64_SH, 0).unwrap();
-    auto d = engine.disassemble(a, 0).unwrap();
+    auto d = engine.disassemble(a, 0).unwrap().pretty_format();
     auto t = engine.assemble(d, 0).unwrap();
     ASSERT_EQ(a, t);
 

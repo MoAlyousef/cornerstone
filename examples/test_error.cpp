@@ -5,7 +5,7 @@
 using namespace cstn;
 
 int main() {
-    std::variant<int, Error> v = ErrorEnum::InitFailure;
+    std::variant<int, Error> v = Error(ErrorEnum::InitFailure, "Some message");
 
     Error e = std::get<Error>(v);
 

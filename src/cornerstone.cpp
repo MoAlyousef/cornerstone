@@ -7,7 +7,6 @@
 #include <cstdlib>
 #include <memory>
 #include <mutex>
-#include <regex>
 
 #include <llvm/Config/llvm-config.h>
 #include <llvm/MC/MCAsmBackend.h>
@@ -82,7 +81,7 @@ static Result<std::string> extract_text(llvm::StringRef objBuf) {
     auto mem      = llvm::MemoryBuffer::getMemBufferCopy(objBuf);
     auto objOrErr = llvm::object::ObjectFile::createObjectFile(mem->getMemBufferRef());
     if (!objOrErr)
-        return Error(ErrorEnum::ReparseObjectError);
+        return Error(ErrorEnum::ReparseObjectError, "Reparse object error");
 
     for (const auto &sec : (*objOrErr)->sections())
         if (sec.isText()) {
@@ -91,7 +90,7 @@ static Result<std::string> extract_text(llvm::StringRef objBuf) {
                 continue;
             return std::string(data->bytes_begin(), data->bytes_end());
         }
-    return Error(ErrorEnum::TextSectionMissing);
+    return Error(ErrorEnum::TextSectionMissing, "Text section missing");
 }
 
 struct Engine::Impl {
@@ -99,7 +98,7 @@ struct Engine::Impl {
     Syntax syntax;
     bool lex_masm;
     SymbolResolver sym_resolver = nullptr;
-    std::shared_ptr<Error> err  = std::make_shared<Error>(ErrorEnum::None);
+    std::shared_ptr<Error> err  = std::make_shared<Error>(Error(ErrorEnum::None));
     Triple triple;
     MCObjectFileInfo mofi;
     MCTargetOptions mc_opts;
@@ -126,74 +125,20 @@ struct Engine::Impl {
         mc_opts = mc::InitMCTargetOptionsFromFlags();
         mri     = std::unique_ptr<MCRegisterInfo>(target->createMCRegInfo(triple.str()));
         if (!mri)
-            return Error(ErrorEnum::InsufficientMemory);
+            return Error(ErrorEnum::InsufficientMemory, "Insufficient memory");
 
         mai = std::unique_ptr<MCAsmInfo>(target->createMCAsmInfo(*mri, triple.str(), mc_opts));
         if (!mai)
-            return Error(ErrorEnum::InsufficientMemory);
+            return Error(ErrorEnum::InsufficientMemory, "Insufficient memory");
 
         mii = std::unique_ptr<MCInstrInfo>(target->createMCInstrInfo());
         if (!mii)
-            return Error(ErrorEnum::InsufficientMemory);
+            return Error(ErrorEnum::InsufficientMemory, "Insufficient memory");
 
         sti = std::unique_ptr<MCSubtargetInfo>(target->createMCSubtargetInfo(triple.str(), "", ""));
         if (!sti)
-            return Error(ErrorEnum::InsufficientMemory);
+            return Error(ErrorEnum::InsufficientMemory, "Insufficient memory");
         return true;
-    }
-
-    Result<std::tuple<
-        std::string,
-        std::unique_ptr<MCContext>,
-        std::unique_ptr<SourceMgr>,
-        std::unique_ptr<MCDisassembler>,
-        std::unique_ptr<MCInstPrinter>>>
-    disassemble_helper(std::string_view bytes_, uint64_t address, bool from_obj) {
-        std::string bytes;
-        if (from_obj) {
-            auto temp = extract_text(bytes_);
-            if (temp.is_err())
-                return temp.unwrap_err();
-            bytes = temp.unwrap();
-        } else {
-            bytes = bytes_;
-        }
-        auto src_mgr = std::make_unique<SourceMgr>();
-        src_mgr->setDiagHandler(
-            +[](const SMDiagnostic &Diag, void *ctx) {
-                auto *err = static_cast<Error *>(ctx);
-                if (err->value == ErrorEnum::None) {
-                    err->value     = ErrorEnum::DisasmError;
-                    err->message   = Diag.getMessage();
-                    err->line_no   = Diag.getLineNo();
-                    err->column_no = Diag.getColumnNo();
-                }
-            },
-            err.get()
-        );
-        auto ctx = std::make_unique<MCContext>(
-            triple, mai.get(), mri.get(), sti.get(), src_mgr.get(), &mc_opts, false
-        );
-        mofi.initMCObjectFileInfo(*ctx, false, false);
-        ctx->setObjectFileInfo(&mofi);
-
-        auto disasm = std::unique_ptr<MCDisassembler>(target->createMCDisassembler(*sti, *ctx));
-        if (!disasm)
-            return Error(ErrorEnum::InsufficientMemory);
-
-        unsigned dialect = !static_cast<unsigned>(syntax);
-        auto printer     = std::unique_ptr<MCInstPrinter>(
-            target->createMCInstPrinter(triple, dialect, *mai, *mii, *mri)
-        );
-        if (!printer)
-            return Error(ErrorEnum::InsufficientMemory);
-        return std::make_tuple(
-            std::move(bytes),
-            std::move(ctx),
-            std::move(src_mgr),
-            std::move(disasm),
-            std::move(printer)
-        );
     }
 };
 Engine::Engine(Opts opts)
@@ -213,65 +158,54 @@ Result<Engine> Engine::create(Opts opts) {
     }
 }
 
-Result<std::string> Engine::disassemble(std::string_view bytes_, uint64_t address, bool from_obj) {
-    auto [bytes, ctx, src_mgr, disasm, printer] =
-        impl->disassemble_helper(bytes_, address, from_obj).unwrap();
-    uint64_t offset = 0;
-    std::string out;
-
-    while (offset < bytes.size()) {
-        MCInst inst;
-        uint64_t instSize = 0;
-
-        auto status = disasm->getInstruction(
-            inst,
-            instSize,
-            // NOLINTNEXTLINE
-            ArrayRef<uint8_t>(
-                std::bit_cast<unsigned char *>(bytes.data()) + offset, bytes.size() - offset
-            ),
-            address + offset,
-            llvm::nulls()
-        );
-        if (status != llvm::MCDisassembler::Success || instSize == 0) {
-            impl->err->value = ErrorEnum::DisasmError;
-            break;
-        }
-
-        std::string instr_line;
-        llvm::raw_string_ostream rs(instr_line);
-
-        printer->printInst(&inst, address + offset, "", *impl->sti, rs);
-        rs.flush();
-
-        instr_line = std::regex_replace(instr_line, std::regex(R"(\s+)"), " ");
-        // NOLINTBEGIN
-        char buf[64];
-        int len = std::snprintf(
-            buf,
-            sizeof(buf),
-            "0x%016llx:\t%s\n",
-            (unsigned long long)(address + offset),
-            instr_line.c_str()
-        );
-        out.append(buf, len);
-        // NOLINTEND
-
-        offset += instSize;
-    }
-
-    if (impl->err->value != ErrorEnum::None)
-        return *impl->err;
-    else {
-        return out;
-    }
-}
-
-Result<InstructionList> Engine::disassemble_insns(
+Result<InstructionList> Engine::disassemble(
     std::string_view bytes_, uint64_t address, bool from_obj
 ) {
-    auto [bytes, ctx, src_mgr, disasm, printer] =
-        impl->disassemble_helper(bytes_, address, from_obj).unwrap();
+    std::string bytes;
+    if (from_obj) {
+        auto temp = extract_text(bytes_);
+        if (temp.is_err())
+            return temp.unwrap_err();
+        bytes = temp.unwrap();
+    } else {
+        bytes = bytes_;
+    }
+    SourceMgr src_mgr;
+    src_mgr.setDiagHandler(
+        +[](const SMDiagnostic &Diag, void *ctx) {
+            auto *err = static_cast<Error *>(ctx);
+            if (err->value == ErrorEnum::None) {
+                err->value     = ErrorEnum::DisasmError;
+                err->message   = Diag.getMessage();
+                err->line_no   = Diag.getLineNo();
+                err->column_no = Diag.getColumnNo();
+            }
+        },
+        impl->err.get()
+    );
+    MCContext ctx(
+        impl->triple,
+        impl->mai.get(),
+        impl->mri.get(),
+        impl->sti.get(),
+        &src_mgr,
+        &impl->mc_opts,
+        false
+    );
+    impl->mofi.initMCObjectFileInfo(ctx, false, false);
+    ctx.setObjectFileInfo(&impl->mofi);
+
+    auto disasm =
+        std::unique_ptr<MCDisassembler>(impl->target->createMCDisassembler(*impl->sti, ctx));
+    if (!disasm)
+        return Error(ErrorEnum::InsufficientMemory, "Insufficient memory");
+
+    unsigned dialect = !static_cast<unsigned>(impl->syntax);
+    auto printer     = std::unique_ptr<MCInstPrinter>(
+        impl->target->createMCInstPrinter(impl->triple, dialect, *impl->mai, *impl->mii, *impl->mri)
+    );
+    if (!printer)
+        return Error(ErrorEnum::InsufficientMemory, "Insufficient memory");
     uint64_t offset = 0;
     InstructionList out;
 
@@ -316,7 +250,7 @@ Result<InstructionList> Engine::disassemble_insns(
         ins.mnemonic = (sp == std::string::npos) ? line : line.substr(0, sp);
         ins.op_str   = (sp == std::string::npos) ? "" : line.substr(sp + 1);
 
-        out.push_back(std::move(ins));
+        out.insns.push_back(std::move(ins));
         offset += instSize;
     }
 
@@ -350,14 +284,14 @@ Result<std::string> Engine::assemble(std::string_view assembly, size_t address, 
 
     auto ce = std::unique_ptr<MCCodeEmitter>(impl->target->createMCCodeEmitter(*impl->mii, ctx));
     if (!ce) {
-        return Error(ErrorEnum::InsufficientMemory);
+        return Error(ErrorEnum::InsufficientMemory, "Insufficient memory");
     }
 
     auto mab = std::unique_ptr<MCAsmBackend>(
         impl->target->createMCAsmBackend(*impl->sti, *impl->mri, impl->mc_opts)
     );
     if (!mab)
-        return Error(ErrorEnum::InsufficientMemory);
+        return Error(ErrorEnum::InsufficientMemory, "Insufficient memory");
     auto ow = mab->createObjectWriter(os);
 
     auto streamer = std::unique_ptr<MCStreamer>(impl->target->createMCObjectStreamer(
@@ -373,7 +307,7 @@ Result<std::string> Engine::assemble(std::string_view assembly, size_t address, 
     ));
 
     if (!streamer) {
-        return Error(ErrorEnum::InsufficientMemory);
+        return Error(ErrorEnum::InsufficientMemory, "Insufficient memory");
     }
 
     auto buf = MemoryBuffer::getMemBuffer(assembly);
@@ -396,13 +330,13 @@ Result<std::string> Engine::assemble(std::string_view assembly, size_t address, 
     auto parser =
         std::unique_ptr<MCAsmParser>(createMCAsmParser(src_mgr, ctx, *streamer, *impl->mai));
     if (!parser) {
-        return Error(ErrorEnum::InsufficientMemory);
+        return Error(ErrorEnum::InsufficientMemory, "Insufficient memory");
     }
     auto tap = std::unique_ptr<MCTargetAsmParser>(
         impl->target->createMCAsmParser(*impl->sti, *parser, *impl->mii, impl->mc_opts)
     );
     if (!tap) {
-        return Error(ErrorEnum::InsufficientMemory);
+        return Error(ErrorEnum::InsufficientMemory, "Insufficient memory");
     }
 
     parser->setAssemblerDialect(!static_cast<unsigned int>(impl->syntax));
@@ -436,7 +370,28 @@ Result<std::string> Engine::assemble(std::string_view assembly, size_t address, 
     }
 }
 
-Error::Error(ErrorEnum val) noexcept : value(val) {}
+Error::Error(ErrorEnum val) noexcept: value(val) {}
+
+Error::Error(ErrorEnum val, std::string s) noexcept : value(val), message(std::move(s)) {}
+
+std::string InstructionList::pretty_format() {
+    std::string out;
+    for (auto &i : insns) {
+        // NOLINTBEGIN
+        char buf[64];
+        int len = std::snprintf(
+            buf, sizeof(buf), "0x%016lx:\t%s %s\n", i.address, i.mnemonic.c_str(), i.op_str.c_str()
+        );
+        out.append(buf, len);
+        // NOLINTEND
+    }
+    return out;
+}
+
+std::ostream &operator<<(std::ostream &os, InstructionList &i) {
+    os << i.pretty_format();
+    return os;
+}
 } // namespace cstn
 
 static void cstn_copy_err(CstnError *err, const cstn::Error &error) {
@@ -481,10 +436,10 @@ extern "C" void CstnError_reset(CstnError *err) {
 }
 
 extern "C" char *cstn_assemble(
-    CstnEngine *cs, const char *string, uint64_t address, size_t *sz, CstnError *err
+    CstnEngine *cs, const char *string, uint64_t address, bool create_obj, size_t *sz, CstnError *err
 ) {
     auto engine = static_cast<cstn::Engine *>(cs);
-    auto ret    = engine->assemble(string, address);
+    auto ret    = engine->assemble(string, address, create_obj);
     CstnError_reset(err);
     char *temp = nullptr;
     if (ret.is_err()) {
@@ -516,40 +471,42 @@ extern "C" char *cstn_assemble_to_obj(
     return temp;
 }
 
-extern "C" char *cstn_disassemble(
-    CstnEngine *cs, const char *code, size_t code_sz, uint64_t address, CstnError *err
+extern "C" size_t cstn_disassemble(
+    CstnEngine *cs,
+    const char *code,
+    size_t code_sz,
+    uint64_t address,
+    bool from_obj,
+    CstnInstr **out,
+    CstnError *err
 ) {
     auto eng = static_cast<cstn::Engine *>(cs);
     std::string_view bytes(std::bit_cast<const char *>(code), code_sz);
 
-    auto ret = eng->disassemble(bytes, address);
+    auto ret = eng->disassemble(bytes, address, from_obj);
     CstnError_reset(err);
 
     if (ret.is_err()) {
         auto &e = ret.unwrap_err();
         cstn_copy_err(err, e);
-        return nullptr;
+        return 0;
     }
-    auto &text = ret.unwrap();
-    return strdup(text.c_str());
-}
-
-extern "C" char *cstn_disassemble_from_obj(
-    CstnEngine *cs, const char *code, size_t code_sz, uint64_t address, CstnError *err
-) {
-    auto eng = static_cast<cstn::Engine *>(cs);
-    std::string_view bytes(std::bit_cast<const char *>(code), code_sz);
-
-    auto ret = eng->disassemble(bytes, address, true);
-    CstnError_reset(err);
-
-    if (ret.is_err()) {
-        auto &e = ret.unwrap_err();
-        cstn_copy_err(err, e);
-        return nullptr;
+    auto &insns = ret.unwrap().insns;
+    auto sz     = insns.size();
+    // NOLINTBEGIN
+    auto temp  = new CstnInstr[sz];
+    size_t cnt = 0;
+    for (auto &i : insns) {
+        temp[cnt].address = i.address;
+        temp[cnt].size    = i.size;
+        memcpy(temp[cnt].bytes, i.bytes.data(), 24);
+        temp[cnt].mnemonic = strdup(i.mnemonic.c_str());
+        temp[cnt].op_str   = strdup(i.op_str.c_str());
+        cnt += 1;
     }
-    auto &text = ret.unwrap();
-    return strdup(text.c_str());
+    *out = temp;
+    // NOLINTEND
+    return sz;
 }
 
 extern "C" CstnError CstnError_none(void) {
@@ -558,41 +515,18 @@ extern "C" CstnError CstnError_none(void) {
     return err;
 }
 
-extern "C" size_t cstn_disassemble_insns(
-    CstnEngine *cs,
-    const char *code,
-    size_t code_sz,
-    uint64_t address,
-    CstnInstr **out, /* malloc’ed array        */
-    CstnError *err
-) {
-    auto eng = static_cast<cstn::Engine *>(cs);
-    std::string_view bytes(std::bit_cast<const char *>(code), code_sz);
-
-    auto ret = eng->disassemble_insns(bytes, address);
-    CstnError_reset(err);
-
-    if (ret.is_err()) {
-        auto &e = ret.unwrap_err();
-        cstn_copy_err(err, e);
-        return 0;
+extern "C" char *cstn_format_insns(CstnInstr *ins, size_t n) {
+    std::string out;
+    for (auto i = 0; i < n; i++) {
+        // NOLINTBEGIN
+        char buf[64];
+        int len = std::snprintf(
+            buf, sizeof(buf), "0x%016lx:\t%s %s\n", ins[i].address, ins[i].mnemonic, ins[i].op_str
+        );
+        out.append(buf, len);
+        // NOLINTEND
     }
-    auto &insns = ret.unwrap();
-    auto sz     = insns.size();
-    // NOLINTBEGIN
-    auto temp  = new CstnInstr[sz];
-    size_t cnt = 0;
-    for (auto &i : insns) {
-        temp[cnt].address = i.address;
-        temp[cnt].size    = i.size;
-        memcpy(temp[cnt].bytes, i.bytes.data(), 16);
-        temp[cnt].mnemonic = strdup(i.mnemonic.c_str());
-        temp[cnt].op_str   = strdup(i.op_str.c_str());
-        cnt += 1;
-    }
-    *out = temp;
-    // NOLINTEND
-    return sz;
+    return strdup(out.c_str());
 }
 
 extern "C" void cstn_free_insns(CstnInstr *ins, size_t n) {
