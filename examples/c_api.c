@@ -30,7 +30,7 @@ int assemble(CstnArch arch, CstnSyntax syntax, bool radix16, const char *assembl
         .syntax = syntax, .lex_masm = radix16, .symbol_resolver = NULL
     };
     CstnError err  = CstnError_none();
-    CstnEngine *cs = cstn_create(arch, opts, &err);
+    CstnEngine *cs = cstn_create(arch, &opts, &err);
 
     if (err.value != CstnError_None) {
         printf("Error code: %d, Error message: %s\n", (int)err.value, err.message);
@@ -65,7 +65,7 @@ int disassemble(CstnArch arch, CstnSyntax syntax, bool radix16, const char *asse
         .syntax = syntax, .lex_masm = radix16, .symbol_resolver = NULL
     };
     CstnError err  = CstnError_none();
-    CstnEngine *cs = cstn_create(arch, opts, &err);
+    CstnEngine *cs = cstn_create(arch, &opts, &err);
 
     if (err.value != CstnError_None) {
         printf("Error code: %d, Error message: %s\n", (int)err.value, err.message);

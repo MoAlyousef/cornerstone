@@ -415,13 +415,15 @@ static void cstn_copy_err(CstnError *err, const cstn::Error &error) {
     err->line_no   = error.line_no;
 }
 
-extern "C" CstnEngine *cstn_create(CstnArch arch, CstnOpts opts, CstnError *err) {
+extern "C" CstnEngine *cstn_create(CstnArch arch, CstnOpts *opts, CstnError *err) {
     cstn::Opts opts0      = {};
-    opts0.syntax          = static_cast<cstn::Syntax>(opts.syntax);
-    opts0.lex_masm        = opts.lex_masm;
-    opts0.symbol_resolver = opts.symbol_resolver;
-    opts0.cpu             = opts.cpu ? opts.cpu : "";
-    opts0.features        = opts.features ? opts.features : "";
+    if (opts) {
+        opts0.syntax          = static_cast<cstn::Syntax>(opts->syntax);
+        opts0.lex_masm        = opts->lex_masm;
+        opts0.symbol_resolver = opts->symbol_resolver;
+        opts0.cpu             = opts->cpu ? opts->cpu : "";
+        opts0.features        = opts->features ? opts->features : "";
+    }
     auto ret              = cstn::Engine::create(static_cast<cstn::Arch>(arch), opts0);
     if (ret.is_ok()) {
         // NOLINTNEXTLINE
@@ -460,24 +462,6 @@ extern "C" char *cstn_assemble(
 ) {
     auto engine = static_cast<cstn::Engine *>(cs);
     auto ret    = engine->assemble(string, address, create_obj);
-    CstnError_reset(err);
-    char *temp = nullptr;
-    if (ret.is_err()) {
-        auto &error = ret.unwrap_err();
-        cstn_copy_err(err, error);
-    } else {
-        auto &v = ret.unwrap();
-        *sz     = v.size();
-        temp    = strdup(v.c_str());
-    }
-    return temp;
-}
-
-extern "C" char *cstn_assemble_to_obj(
-    CstnEngine *cs, const char *string, uint64_t address, size_t *sz, CstnError *err
-) {
-    auto engine = static_cast<cstn::Engine *>(cs);
-    auto ret    = engine->assemble(string, address, true);
     CstnError_reset(err);
     char *temp = nullptr;
     if (ret.is_err()) {

@@ -195,7 +195,7 @@ CstnError CstnError_none(void);
  *
  * @return Non‑NULL on success; NULL on failure (see @p err).
  */
-CstnEngine *cstn_create(CstnArch arch, CstnOpts opts, CstnError *err);
+CstnEngine *cstn_create(CstnArch arch, CstnOpts *opts, CstnError *err);
 
 /** Destroy an engine previously returned from #cstn_create. */
 void cstn_destroy(CstnEngine *cs);
@@ -218,21 +218,6 @@ void cstn_destroy(CstnEngine *cs);
  */
 char *cstn_assemble(
     CstnEngine *cs, const char *string, uint64_t address, bool create_obj, size_t *sz, CstnError *err
-);
-
-/**
- * Assemble textual @p string into an object‑file byte buffer.
- *
- * @param cs      Engine handle.
- * @param string  UTF‑8 assembly source (null‑terminated).
- * @param address Origin address that “.” and label references start from.
- * @param sz      [out] size in bytes of the returned buffer.
- * @param err     [out] diagnostic info (see #CstnError).  Must not be NULL.
- *
- * @return Pointer to heap‑allocated memory (use `free()`).  NULL on error.
- */
-char *cstn_assemble_to_obj(
-    CstnEngine *cs, const char *string, uint64_t address, size_t *sz, CstnError *err
 );
 
 /**

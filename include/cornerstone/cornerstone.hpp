@@ -264,7 +264,7 @@ class Engine {
      *  @returns `Result<Engine>` that contains a fully‑initialised engine or a
      *           diagnostic error.
      */
-    static Result<Engine> create(Arch arch, Opts opts);
+    static Result<Engine> create(Arch arch, Opts opts = {});
 
     /**
      * Assemble @p assembly into an object‑file byte stream starting at
