@@ -1,7 +1,6 @@
 #include <cornerstone/cornerstone.h>
 #include <cornerstone/cornerstone.hpp>
 
-#include <bit>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -118,8 +117,8 @@ struct Engine::Impl {
         std::string cpu_,
         std::string features_
     )
-        : arch(arch_), syntax(syntax_), lex_masm(lex_masm_), sym_resolver(s), cpu(cpu_),
-          features(features_) {}
+        : arch(arch_), syntax(syntax_), lex_masm(lex_masm_), sym_resolver(s), cpu(std::move(cpu_)),
+          features(std::move(features_)) {}
 
     Result<bool> init() {
         init_llvm();
@@ -230,9 +229,9 @@ Result<InstructionList> Engine::disassemble(
         auto status = disasm->getInstruction(
             inst,
             instSize,
-            // NOLINTNEXTLINE
             ArrayRef<uint8_t>(
-                std::bit_cast<unsigned char *>(bytes.data()) + offset, bytes.size() - offset
+                // NOLINTNEXTLINE
+                reinterpret_cast<unsigned char *>(bytes.data()) + offset, bytes.size() - offset
             ),
             address + offset,
             llvm::nulls()
@@ -245,8 +244,8 @@ Result<InstructionList> Engine::disassemble(
         Instruction ins;
         ins.address = address + offset;
         ins.size    = instSize;
+        // NOLINTNEXTLINE
         std::memcpy(ins.bytes.data(), bytes.data() + offset, instSize);
-
         std::string line;
         llvm::raw_string_ostream rs(line);
         printer->printInst(&inst, ins.address, "", *impl->sti, rs);
@@ -485,7 +484,8 @@ extern "C" size_t cstn_disassemble(
     CstnError *err
 ) {
     auto eng = static_cast<cstn::Engine *>(cs);
-    std::string_view bytes(std::bit_cast<const char *>(code), code_sz);
+    // NOLINTNEXTLINE
+    std::string_view bytes(reinterpret_cast<const char *>(code), code_sz);
 
     auto ret = eng->disassemble(bytes, address, from_obj);
     CstnError_reset(err);
@@ -503,7 +503,7 @@ extern "C" size_t cstn_disassemble(
     for (auto &i : insns) {
         temp[cnt].address = i.address;
         temp[cnt].size    = i.size;
-        memcpy(temp[cnt].bytes, i.bytes.data(), 24);
+        std::memcpy(temp[cnt].bytes, i.bytes.data(), 24);
         temp[cnt].mnemonic = strdup(i.mnemonic.c_str());
         temp[cnt].op_str   = strdup(i.op_str.c_str());
         cnt += 1;

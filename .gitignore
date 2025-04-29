@@ -3,3 +3,4 @@ bin
 outfile
 html_reports
 .clangd
+temp

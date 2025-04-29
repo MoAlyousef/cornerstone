@@ -17,6 +17,7 @@
  * once created.  Guard them with external mutexes if you share across threads.
  */
 
+#include <array>
 #include <memory>
 #include <ostream>
 #include <span>
@@ -142,7 +143,6 @@ enum class ErrorEnum {
     MissingSymbol,      ///< Undefined symbol & no user override.
 };
 
-// clang‑tidy complains about non‑trivial destructor, suppress it for this POD.
 // NOLINTBEGIN
 /**
  * Rich error object returned through `Result<T>`.

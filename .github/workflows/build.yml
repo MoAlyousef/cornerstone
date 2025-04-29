@@ -3,23 +3,97 @@ name: CMake
 on:
   push:
     branches: [ main ]
+    tags:     [ 'v*' ]
   pull_request:
     branches: [ main ]
 
+
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
+  build-posix:
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v3
-    - uses: seanmiddleditch/gha-setup-ninja@master
-    - name: Install llvm
-      shell: bash
-      run: sudo apt-get update && sudo apt-get install llvm-dev --no-install-recommends -y
+    - uses: actions/checkout@v4
+    - name: Install LLVM
+      uses: KyleMayes/install-llvm-action@v2
+      with:
+        version: "18.1"                       
+        directory: ${{ runner.tool_cache }}/llvm
+
+    - name: Configure
+      env:
+        LLVM_DIR: ${{ runner.tool_cache }}/llvm/lib/cmake/llvm
+        LLVM_CONFIG: ${{ runner.tool_cache }}/llvm/bin/llvm-config
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
     - name: Build
+      run: cmake --build build --config Release
+
+    - name: Package artifact
+      run: |
+          find build -maxdepth 1 -type f \
+          \( -name 'libcornerstone*.so*' -o -name 'libcornerstone*.dylib*' \) \
+          -print0 \
+          | tar --null --files-from=- -czf cornerstone-${{ matrix.os }}.tar.gz
+    - uses: actions/upload-artifact@v4
+      with:
+        name: cornerstone-${{ matrix.os }}
+        path: cornerstone-${{ matrix.os }}.tar.gz
+  build-windows:
+    runs-on: windows-latest 
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install LLVM (win-llvm)
       shell: bash
-      run: cmake -Bbin -GNinja && cmake --build bin 
-      
+      run: |
+        FILE="llvm-18.1.8"
+        URL="https://github.com/c3lang/win-llvm/releases/download/llvm_18_1_8/llvm-18.1.8-windows-amd64-msvc17-msvcrt.7z"
+
+        echo "Downloading $URL"
+        curl -LsSf -o "$FILE" "$URL"
+
+        # RUNNER_TEMP is available inside the step
+        LLVM_ROOT="$RUNNER_TEMP/llvm-18.1.8"
+        mkdir -p "$LLVM_ROOT"
+
+        echo "Extracting to $LLVM_ROOT"
+        7z x "$FILE" "-o$LLVM_ROOT" >/dev/null
+
+        # Add clang/llvm binaries to PATH
+        echo "$LLVM_ROOT/bin" >> "$GITHUB_PATH"
+
+        # Export LLVM_DIR for subsequent steps
+        echo "LLVM_DIR=$LLVM_ROOT/lib/cmake/llvm" >> "$GITHUB_ENV"
+
+    - name: Configure
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLVM_USE_STATIC_LIBS=ON
+
+    - name: Build
+      run: cmake --build build --config Release
+
+    - name: Package artifact
+      run: |
+        7z a cornerstone-windows.zip ./build/Release/cornerstone.dll
+    - uses: actions/upload-artifact@v4
+      with:
+        name: cornerstone-windows
+        path: cornerstone-windows.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build-posix, build-windows]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Download all build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Publish GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: artifacts/**/*

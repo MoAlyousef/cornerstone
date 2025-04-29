@@ -3,7 +3,7 @@
 
 using namespace cstn;
 
-const char *LINUX_X64_SH = R"lit(push 0x68
+const char *const LINUX_X64_SH = R"lit(push 0x68
     mov rax, 0x732f2f2f6e69622f
     push rax
     mov rdi, rsp
