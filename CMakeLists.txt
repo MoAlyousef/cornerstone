@@ -88,8 +88,15 @@ if(CORNERSTONE_BUILD_SHARED)
   set(CORNERSTONE_LIB_FORM SHARED)
 endif()
 
-add_library(cornerstone ${CORNERSTONE_LIB_FORM}
-  src/cornerstone.cpp
+add_library(cornerstone ${CORNERSTONE_LIB_FORM})
+
+target_sources(cornerstone 
+    PRIVATE 
+        src/cornerstone.cpp
+    PUBLIC 
+        FILE_SET HEADERS
+        BASE_DIRS ${CMAKE_CURRENT_LIST_DIR}/include
+        FILES ${CORNERSTONE_HEADER_FILES}
 )
 
 if(CORNERSTONE_ENABLE_ALL_ARCHS)
@@ -123,11 +130,6 @@ target_compile_definitions(cornerstone PRIVATE
 target_link_libraries(cornerstone PRIVATE ${LLVM_LIBS})
 target_compile_features(cornerstone PUBLIC cxx_std_20)
 
-target_include_directories(cornerstone PUBLIC 
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include>
-)
-
 set_target_properties(cornerstone PROPERTIES
   VERSION ${CORNERSTONE_PROJECT_VERSION}
   PUBLIC_HEADER "${CORNERSTONE_HEADER_FILES}"
@@ -143,28 +145,23 @@ write_basic_package_version_file(
   COMPATIBILITY SameMajorVersion
 )
 
-install(
-  TARGETS cornerstone
-  EXPORT cornerstoneConfig
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
-  LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
-  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_PREFIX}/include/cornerstone
-)
-
-export(
-  TARGETS cornerstone
-  NAMESPACE cornerstone::
-  FILE "${CMAKE_CURRENT_BINARY_DIR}/cornerstoneConfig.cmake"
-)
-
-install(
-  EXPORT cornerstoneConfig
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cmake/cornerstone"
-  NAMESPACE cornerstone::
-)
+include(GNUInstallDirs)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cornerstoneConfigVersion.cmake
   DESTINATION ${CMAKE_INSTALL_PREFIX}/share/cmake/cornerstone
+)
+
+install(
+    TARGETS   cornerstone
+    EXPORT    cornerstoneTargets
+    FILE_SET  HEADERS
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(EXPORT cornerstoneTargets
+    FILE cornerstoneTargets.cmake
+    NAMESPACE cornerstone::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cornerstone
 )
 
 if(CORNERSTONE_BUILD_EXAMPLES)
