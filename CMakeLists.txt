@@ -130,11 +130,6 @@ target_compile_definitions(cornerstone PRIVATE
 target_link_libraries(cornerstone PRIVATE ${LLVM_LIBS})
 target_compile_features(cornerstone PUBLIC cxx_std_20)
 
-set_target_properties(cornerstone PROPERTIES
-  VERSION ${CORNERSTONE_PROJECT_VERSION}
-  PUBLIC_HEADER "${CORNERSTONE_HEADER_FILES}"
-)
-
 add_library(cornerstone::cornerstone ALIAS cornerstone)
 
 include(CMakePackageConfigHelpers)
