@@ -1,0 +1,7 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(LLVM CONFIG)
+
+include("${CMAKE_CURRENT_LIST_DIR}/cornerstoneTargets.cmake")
+

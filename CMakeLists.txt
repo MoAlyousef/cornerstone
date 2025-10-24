@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.28)
 set(CORNERSTONE_PROJECT_VERSION 0.1.0)
 
 project(cornerstone
@@ -133,18 +133,9 @@ target_compile_features(cornerstone PUBLIC cxx_std_20)
 add_library(cornerstone::cornerstone ALIAS cornerstone)
 
 include(CMakePackageConfigHelpers)
-
-write_basic_package_version_file(
-  ${CMAKE_CURRENT_BINARY_DIR}/cornerstoneConfigVersion.cmake
-  VERSION ${CORNERSTONE_PROJECT_VERSION}
-  COMPATIBILITY SameMajorVersion
-)
-
 include(GNUInstallDirs)
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cornerstoneConfigVersion.cmake
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/share/cmake/cornerstone
-)
+set(cornerstone_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/cornerstone")
 
 install(
     TARGETS   cornerstone
@@ -156,7 +147,27 @@ install(
 install(EXPORT cornerstoneTargets
     FILE cornerstoneTargets.cmake
     NAMESPACE cornerstone::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cornerstone
+    DESTINATION ${cornerstone_INSTALL_CMAKEDIR}
+)
+
+configure_package_config_file(
+  "${CMAKE_CURRENT_LIST_DIR}/cmake/cornerstoneConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/cornerstoneConfig.cmake"
+  INSTALL_DESTINATION "${cornerstone_INSTALL_CMAKEDIR}"
+  NO_CHECK_REQUIRED_COMPONENTS_MACRO
+)
+
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/cornerstoneConfigVersion.cmake"
+  VERSION ${CORNERSTONE_PROJECT_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+
+install(
+  FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/cornerstoneConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/cornerstoneConfigVersion.cmake"
+  DESTINATION "${cornerstone_INSTALL_CMAKEDIR}"
 )
 
 if(CORNERSTONE_BUILD_EXAMPLES)
